@@ -20,6 +20,11 @@ type WindowDelegate interface {
     NeedsRender() bool
 }
 
+func WindowAspectRatio(window *glfw.Window) float64 {
+    frameWidth, frameHeight := window.GetFramebufferSize()
+    return float64(frameWidth) / float64(frameHeight)
+}
+
 func bindEvents(window *glfw.Window, delegate WindowDelegate) {
     window.SetFramebufferSizeCallback(delegate.Reshape)
     window.SetMouseButtonCallback(delegate.MouseClick)
