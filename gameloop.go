@@ -1,7 +1,6 @@
 package render
 
 import (
-    // "fmt"
     "time"
     "errors"
     glfw "github.com/go-gl/glfw3"
