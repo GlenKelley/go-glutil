@@ -53,8 +53,6 @@ func ImageData(img image.Image) (gl.Sizei, gl.Sizei, gl.Enum, gl.Enum, gl.Pointe
     return 0,0,gl.RGB,gl.UNSIGNED_BYTE,nil
 }
 
-//gl.Sizei(width), gl.Sizei(height)
-//gl.RGB, gl.UNSIGNED_BYTE
 func LoadTexture(filename string) (gl.Uint, error) {
     var texture gl.Uint
     file, err := os.Open(filename)
@@ -95,7 +93,7 @@ func LoadShader(shaderType gl.Enum, filename string) (gl.Uint, error){
     var ok gl.Int
     gl.GetShaderiv(shader, gl.COMPILE_STATUS, &ok)
     if (ok == 0) {
-        fmt.Println(gl.GetShaderInfoLog(shader))
+        fmt.Fprintln(os.Stderr, gl.GetShaderInfoLog(shader))
         gl.DeleteShader(shader)
         return 0, errors.New("Failed to compile " + filename + "\n")
     }
@@ -110,7 +108,7 @@ func CreateProgram(vertexShader, fragmentShader gl.Uint) (gl.Uint, error) {
     var ok gl.Int
     gl.GetProgramiv(program, gl.LINK_STATUS, &ok)
      if (ok == 0) {
-         fmt.Println(gl.GetProgramInfoLog(program))
+        fmt.Fprintln(os.Stderr, gl.GetProgramInfoLog(program))
          gl.DeleteProgram(program)
          return 0, errors.New("Failed to link shader program")
      }
