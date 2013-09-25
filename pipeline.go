@@ -35,10 +35,10 @@ func ArrayPtr(data interface{}) (gl.Pointer, gl.Sizeiptr) {
     return ptr, size
 }
 
-func BindBufferData(buffer gl.Uint, target gl.Enum, data interface{}) {
+func BindArrayData(buffer gl.Buffer, data interface{}) {
     ptr, size := ArrayPtr(data)
-    gl.BindBuffer(target, buffer)
-    gl.BufferData(target, size, ptr, gl.STATIC_DRAW)
+    gl.BindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.BufferData(gl.ARRAY_BUFFER, size, ptr, gl.STATIC_DRAW)
 }
 
 func ImageData(img image.Image) (gl.Sizei, gl.Sizei, gl.Enum, gl.Enum, gl.Pointer) {
@@ -53,19 +53,17 @@ func ImageData(img image.Image) (gl.Sizei, gl.Sizei, gl.Enum, gl.Enum, gl.Pointe
     return 0,0,gl.RGB,gl.UNSIGNED_BYTE,nil
 }
 
-func LoadTexture(filename string) (gl.Uint, error) {
-    var texture gl.Uint
+func LoadTexture(texture gl.Texture, filename string) error {
     file, err := os.Open(filename)
     if err != nil {
-        return 0, err
+        return err
     }
     defer file.Close()
     img, _, err := image.Decode(file)
     if err != nil {
-        return 0, err
+        return err
     }
     width, height, format, channelType, pixels := ImageData(img)
-    gl.GenTextures(1, &texture)
     gl.BindTexture(gl.TEXTURE_2D, texture)
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -78,15 +76,22 @@ func LoadTexture(filename string) (gl.Uint, error) {
           format, channelType,          /* external format, type */
           pixels,                      /* pixels */
     )
-    return texture, nil
+    return nil
 }
 
-func LoadShader(shaderType gl.Enum, filename string) (gl.Uint, error){
+func LoadVertexShaderSource(shader gl.VertexShader, filename string) error {
+    return LoadShader(gl.Uint(shader), filename)
+}
+
+func LoadFragmentShaderSource(shader gl.FragmentShader, filename string) error {
+    return LoadShader(gl.Uint(shader), filename)
+}
+
+func LoadShader(shader gl.Uint, filename string) error {
     bytes, err := ioutil.ReadFile(filename)
     if err != nil {
-        return 0, err
+        return err
     }
-    shader := gl.CreateShader(shaderType)
     source := string(bytes)
     gl.ShaderSource(shader, []string{source})
     gl.CompileShader(shader)
@@ -95,22 +100,110 @@ func LoadShader(shaderType gl.Enum, filename string) (gl.Uint, error){
     if (ok == 0) {
         fmt.Fprintln(os.Stderr, gl.GetShaderInfoLog(shader))
         gl.DeleteShader(shader)
-        return 0, errors.New("Failed to compile " + filename + "\n")
+        return errors.New("Failed to compile " + filename + "\n")
     }
-    return shader, nil
+    return nil
 }
 
-func CreateProgram(vertexShader, fragmentShader gl.Uint) (gl.Uint, error) {
-    program := gl.CreateProgram()
-    gl.AttachShader(program, vertexShader)
-    gl.AttachShader(program, fragmentShader)
+func LoadProgram(program gl.Program, vertexShader gl.VertexShader, fragmentShader gl.FragmentShader) error {
+    gl.AttachShader(program, gl.Uint(vertexShader))
+    gl.AttachShader(program, gl.Uint(fragmentShader))
     gl.LinkProgram(program)
     var ok gl.Int
     gl.GetProgramiv(program, gl.LINK_STATUS, &ok)
      if (ok == 0) {
         fmt.Fprintln(os.Stderr, gl.GetProgramInfoLog(program))
          gl.DeleteProgram(program)
-         return 0, errors.New("Failed to link shader program")
+         return errors.New("Failed to link shader program")
      }
-     return program, nil
+     return nil
+}
+
+var bufferType          = reflect.TypeOf(gl.Buffer(0))
+var textureType         = reflect.TypeOf(gl.Texture(0))
+var vaoType             = reflect.TypeOf(gl.VertexArrayObject(0))
+var vertexShaderType    = reflect.TypeOf(gl.VertexShader(0))
+var fragmentShaderType  = reflect.TypeOf(gl.FragmentShader(0))
+var programType         = reflect.TypeOf(gl.Program(0))
+var uniformLocationType = reflect.TypeOf(gl.UniformLocation(0))
+var attributeLocationType = reflect.TypeOf(gl.AttributeLocation(0))
+
+
+func Bind (bindings interface{}) {
+    value := reflect.ValueOf(bindings).Elem()
+    n := value.NumField()
+    
+    for i := 0; i < n; i++ {
+        field := value.Field(i)
+        switch field.Type() {
+        case bufferType: 
+            buffer := gl.GenBuffer()
+            field.Set(reflect.ValueOf(buffer))
+        case textureType:
+            texture := gl.GenTexture()
+            field.Set(reflect.ValueOf(texture))
+        case vaoType:
+            vao := gl.GenVertexArray()
+            field.Set(reflect.ValueOf(vao))
+        case vertexShaderType:
+            shader := gl.VertexShader(gl.CreateShader(gl.VERTEX_SHADER))
+            field.Set(reflect.ValueOf(shader))
+        case fragmentShaderType:
+            shader := gl.FragmentShader(gl.CreateShader(gl.FRAGMENT_SHADER))
+            field.Set(reflect.ValueOf(shader))
+        case programType:
+            program := gl.CreateProgram()
+            field.Set(reflect.ValueOf(program))
+        }   
+    }
+    // VertexBuffer gl.Buffer
+    // ElementBuffer gl.Buffer
+    // Tex [2]gl.Texture
+    // VAO gl.VertexArrayObject    
+}
+
+func BindProgramLocations(program gl.Program, bindings interface{}) {
+    value := reflect.ValueOf(bindings).Elem()
+    n := value.NumField()
+    for i := 0; i < n; i++ {
+        field := value.Field(i)
+        name := value.Type().Field(i).Tag.Get("gl")
+        if name != "" {
+            switch field.Type() {
+            case uniformLocationType: 
+                location := gl.GetUniformLocation(program, name)
+                field.Set(reflect.ValueOf(location))
+            case attributeLocationType:
+                location := gl.GetAttribLocation(program, name)
+                field.Set(reflect.ValueOf(location))
+            }
+        }
+    }
+}
+
+func AttachTexture(location gl.UniformLocation, textureEnum gl.Enum, target gl.Enum, texture gl.Texture) {
+    gl.ActiveTexture(textureEnum)
+    gl.BindTexture(target, texture)
+    gl.Uniform1i(location, gl.Int(textureEnum - gl.TEXTURE0))
+}
+
+func PanicOnError() {
+    err := gl.GetError()
+    if err != gl.NO_ERROR {
+        switch err {
+        case gl.INVALID_ENUM:
+            fmt.Println("INVALID_ENUM")
+        case gl.INVALID_VALUE:
+            fmt.Println("INVALID_VALUE")
+        case gl.INVALID_OPERATION:
+            fmt.Println("GL_INVALID_OPERATION")
+        case gl.INVALID_FRAMEBUFFER_OPERATION:
+            fmt.Println("GL_INVALID_FRAMEBUFFER_OPERATION")
+        case gl.OUT_OF_MEMORY:
+            fmt.Println("GL_OUT_OF_MEMORY")
+        default:
+            fmt.Println("other error", err)
+        }
+        panic(err)
+    }
 }

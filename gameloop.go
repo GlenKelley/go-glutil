@@ -14,7 +14,7 @@ type WindowDelegate interface {
     MouseMove(window *glfw.Window, xpos float64, ypos float64)
     KeyPress(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw.ModifierKey)
     Scroll(window *glfw.Window, xoff float64, yoff float64)
-    Simulate(now time.Time, duration time.Duration)
+    Simulate(now time.Time, elapsed time.Duration, duration time.Duration)
     OnClose(window *glfw.Window)
     IsIdle() bool
     NeedsRender() bool
@@ -71,7 +71,8 @@ func CreateWindow(width, height int, name string, fullscreen bool, delegate Wind
     for !window.ShouldClose() {
         now := time.Now()
         duration := now.Sub(last)
-        delegate.Simulate(now, duration)
+        elapsed := now.Sub(start)
+        delegate.Simulate(now, elapsed, duration)
         if delegate.NeedsRender() {
             delegate.Draw(window)
         }
