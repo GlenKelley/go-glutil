@@ -17,20 +17,65 @@ func ArrayPtr(data interface{}) (gl.Pointer, gl.Sizeiptr) {
     var size gl.Sizeiptr
     var ptr gl.Pointer 
     switch data := data.(type) {
+    case []float64:
+        duplicate := make([]gl.Float, len(data))
+        for i, v := range data {
+            duplicate[i] = gl.Float(v)
+        }
+        ptr, size = ArrayPtr(duplicate)
+    case []float32:
+        if len(data) == 0 {
+            size = 0
+            ptr = gl.Pointer(nil)
+        } else {
+            var v float32
+            size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
+            ptr = gl.Pointer(&data[0])
+        }
     case []gl.Float:
-        var v gl.Float
-        size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
-        ptr = gl.Pointer(&data[0])
+        if len(data) == 0 {
+            size = 0
+            ptr = gl.Pointer(nil)
+        } else {
+            var v gl.Float
+            size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
+            ptr = gl.Pointer(&data[0])
+        }
+    case []int16:
+        if len(data) == 0 {
+            size = 0
+            ptr = gl.Pointer(nil)
+        } else {
+            var v int16
+            size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
+            ptr = gl.Pointer(&data[0])
+        }
     case []gl.Ushort:
-        var v gl.Ushort
-        size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
-        ptr = gl.Pointer(&data[0])
+        if len(data) == 0 {
+            size = 0
+            ptr = gl.Pointer(nil)
+        } else {
+            var v gl.Ushort
+            size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
+            ptr = gl.Pointer(&data[0])
+        }
+    case []int:
+        duplicate := make([]gl.Ushort, len(data))
+        for i, v := range data {
+            duplicate[i] = gl.Ushort(v)
+        }
+        ptr, size = ArrayPtr(duplicate)
     case []gl.Int:
-        var v gl.Int
-        size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
-        ptr = gl.Pointer(&data[0])
+        if len(data) == 0 {
+            size = 0
+            ptr = gl.Pointer(nil)
+        } else {
+            var v gl.Int
+            size = gl.Sizeiptr(len(data) * int(unsafe.Sizeof(v)))
+            ptr = gl.Pointer(&data[0])
+        }
     default:
-        panic("unknown data type")
+        panic(fmt.Sprintln("unknown data type:", reflect.TypeOf(data)))
     }
     return ptr, size
 }
