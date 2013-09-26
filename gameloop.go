@@ -78,6 +78,7 @@ func CreateWindow(width, height int, name string, fullscreen bool, delegate Wind
         duration := now.Sub(last)
         elapsed := now.Sub(start)
         delegate.Simulate(now, elapsed, duration)
+        last = now
         if delegate.NeedsRender() {
             delegate.Draw(window)
         }
