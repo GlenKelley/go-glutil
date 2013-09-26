@@ -53,6 +53,11 @@ func CreateWindow(width, height int, name string, fullscreen bool, delegate Wind
         if err != nil {
             return err
         }
+        
+        vidModes, _ := monitor.GetVideoModes()
+        maxResolution := vidModes[len(vidModes)-1]
+        width = maxResolution.Width
+        height = maxResolution.Height
     }
     window, err := glfw.CreateWindow(width, height, name, monitor, nil)
     if err != nil {
