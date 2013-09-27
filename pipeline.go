@@ -4,6 +4,7 @@ import (
    "errors"
    "fmt"
    gl "github.com/GlenKelley/go-gl32"
+   glm "github.com/Jragonmiris/mathgl"
    "image"
    _ "image/jpeg"
    _ "image/png"
@@ -328,9 +329,6 @@ func PanicOnError() {
 }
 
 type StencilOp struct {
-   // gl.Enable(gl.STENCIL_TEST)
-   // gl.StencilFunc(gl.EQUAL, 1, ^gl.Uint(0))
-   // gtk.PanicOnError()
 }
 
 var Stencil StencilOp
@@ -411,4 +409,98 @@ func (s *StencilOp) Increment() *StencilOp {
 func (s *StencilOp) Decrement() *StencilOp {
    gl.StencilOp(gl.KEEP, gl.KEEP, gl.DECR)
    return s
+}
+
+type Model struct {
+   Transform glm.Mat4f
+   Geometry []*Geometry
+   Children []*Model
+}
+
+type Geometry struct {
+   VertexBuffer gl.Buffer
+   NormalBuffer gl.Buffer
+   Elements []*DrawElements
+}
+
+type DrawElements struct {
+   Buffer gl.Buffer
+   DrawType gl.Enum
+   Count int
+}
+
+func NewSingleModel(verticies, normals []float32, elements []int16, drawType gl.Enum, transform glm.Mat4f) *Model {
+   drawElements := []*DrawElements{NewDrawElements(elements, drawType)}
+   geometries := []*Geometry{NewGeometry(verticies, normals, drawElements)}
+   model := NewModel([]*Model{}, geometries, transform)
+   return model
+}
+
+func NewModel(children []*Model, geometry []*Geometry, transform glm.Mat4f) *Model {
+   return &Model{
+      transform,
+      geometry,
+      children,
+   }
+}
+
+func EmptyModel() *Model {
+   return &Model {
+      glm.Ident4f(),
+      []*Geometry{},
+      []*Model{},
+   }
+}
+
+func (model *Model) AddChild(child *Model) {
+   model.Children = append(model.Children, child)
+}
+
+func (model *Model) AddGeometry(geometry ...*Geometry) {
+   model.Geometry = append(model.Geometry, geometry...)
+}
+
+func NewGeometry(verticies, normals []float32, elements []*DrawElements) *Geometry {
+   var vertexBuffer gl.Buffer = 0
+   var normalBuffer gl.Buffer = 0
+   if (len(verticies) > 0) {
+      vertexBuffer = gl.GenBuffer()
+      BindArrayData(vertexBuffer, verticies)      
+   }
+   if (len(normals) > 0) {
+      normalBuffer = gl.GenBuffer()
+      BindArrayData(normalBuffer, normals)
+   }
+   return &Geometry{
+      vertexBuffer,
+      normalBuffer,
+      elements,
+   }
+}
+
+func (geometry *Geometry) AddDrawElements(drawElements *DrawElements) {
+   geometry.Elements = append(geometry.Elements, drawElements)
+}
+
+func NewDrawElements(elements []int16, drawType gl.Enum) *DrawElements {
+   count := len(elements)
+   if count > 0 {
+      buffer := gl.GenBuffer()
+      BindArrayData(buffer, elements)
+      return &DrawElements{
+         buffer,
+         drawType,
+         count,
+      }
+   }
+   return nil
+}
+
+func MakeElements(elementMap map[gl.Enum][]int16) []*DrawElements {
+   elements := make([]*DrawElements, 0, len(elementMap))
+   for k, v := range elementMap {
+      drawElements := NewDrawElements(v, k)
+      elements = append(elements, drawElements)
+   }
+   return elements
 }
