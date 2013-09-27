@@ -5,6 +5,7 @@ import (
     "fmt"
     "image"
     "errors"
+    "runtime/debug"
     "unsafe"
     "reflect"
     "io/ioutil"
@@ -12,6 +13,75 @@ import (
     _ "image/jpeg"
     gl "github.com/GlenKelley/go-gl32"
 )
+
+type ShaderLibrary struct {
+   FragmentShaders map[string]gl.FragmentShader
+   VertexShaders map[string]gl.VertexShader
+   Programs map[string]gl.Program
+}
+
+func NewShaderLibrary() ShaderLibrary {
+   return ShaderLibrary {
+      make(map[string]gl.FragmentShader),
+      make(map[string]gl.VertexShader),
+      make(map[string]gl.Program),
+   }
+}
+
+func (lib *ShaderLibrary) LoadFragmentShader(tag ,filename string) {   
+   _, ok := lib.FragmentShaders[tag]
+   if !ok {
+      shader := gl.FragmentShader(gl.CreateShader(gl.FRAGMENT_SHADER))
+      err := LoadFragmentShaderSource(shader, filename)
+      if err != nil {panic(err)}
+      lib.FragmentShaders[tag] = shader
+   }
+}
+
+func (lib *ShaderLibrary) LoadVertexShader(tag, filename string) {
+   _, ok := lib.VertexShaders[tag]
+   if !ok {
+      shader := gl.VertexShader(gl.CreateShader(gl.VERTEX_SHADER))
+      err := LoadVertexShaderSource(shader, filename)
+      if err != nil {panic(err)}
+      lib.VertexShaders[tag] = shader
+   }
+}
+
+func (lib *ShaderLibrary) LoadProgram(tag, vsfilename, fsfilename string) {
+   vtag := tag + "_vs"
+   ftag := tag + "_fs"
+   lib.LoadVertexShader(vtag, vsfilename)
+   lib.LoadFragmentShader(ftag, fsfilename)
+   program := gl.CreateProgram()
+   err := LoadProgram(program, lib.VertexShaders[vtag], lib.FragmentShaders[ftag])
+   if err != nil {panic(err)}
+   _, ok := lib.Programs[tag]
+   if !ok {
+      lib.Programs[tag] = program
+   } else {
+      panic("program: '" + tag + "' already defined")
+   }
+}
+
+func (lib *ShaderLibrary) BindProgramLocations(tag string, obj interface{}) {
+   program, ok := lib.GetProgram(tag)
+   if ok {
+      BindProgramLocations(program, obj)      
+   }
+}
+
+func (lib *ShaderLibrary) UseProgram(tag string) {
+   program, ok := lib.GetProgram(tag)
+   if ok {
+      gl.UseProgram(program)
+   }
+}
+
+func (lib *ShaderLibrary) GetProgram(tag string) (gl.Program, bool) {
+   program, ok := lib.Programs[tag]
+   return program, ok
+}
 
 func ArrayPtr(data interface{}) (gl.Pointer, gl.Sizeiptr) {
     var size gl.Sizeiptr
@@ -218,9 +288,11 @@ func BindProgramLocations(program gl.Program, bindings interface{}) {
             case uniformLocationType: 
                 location := gl.GetUniformLocation(program, name)
                 field.Set(reflect.ValueOf(location))
+                PanicOnError()
             case attributeLocationType:
                 location := gl.GetAttribLocation(program, name)
                 field.Set(reflect.ValueOf(location))
+                PanicOnError()
             }
         }
     }
@@ -249,6 +321,93 @@ func PanicOnError() {
         default:
             fmt.Println("other error", err)
         }
+        debug.PrintStack()
         panic(err)
     }
+}
+
+type StencilOp struct {
+   // gl.Enable(gl.STENCIL_TEST)
+   // gl.StencilFunc(gl.EQUAL, 1, ^gl.Uint(0))
+   // gtk.PanicOnError()
+}
+
+var Stencil StencilOp
+
+func (s *StencilOp) Enable() *StencilOp {
+   gl.Enable(gl.STENCIL_TEST)
+   s.Draw()
+   s.Mask(0)
+   s.Keep()
+   s.Depth()
+   s.DepthMask()
+   return s
+}
+
+func (s *StencilOp) Disable() *StencilOp {
+   gl.Disable(gl.STENCIL_TEST)
+   s.Draw()
+   s.Depth()
+   s.DepthMask()
+   return s
+}
+
+func (s *StencilOp) Draw() *StencilOp {
+   gl.ColorMask(gl.TRUE, gl.TRUE, gl.TRUE, gl.TRUE)  
+   return s
+}
+
+func (s *StencilOp) NoDraw() *StencilOp {
+   gl.ColorMask(gl.FALSE, gl.FALSE, gl.FALSE, gl.FALSE)  
+   return s
+}
+
+func (s *StencilOp) Mask(level int) *StencilOp {
+   gl.StencilFunc(gl.EQUAL, gl.Int(level), ^gl.Uint(0))
+   return s
+}
+
+func (s *StencilOp) Unmask(level int) *StencilOp {
+   gl.StencilFunc(gl.ALWAYS, gl.Int(level), ^gl.Uint(0))
+   return s
+}
+
+func (s *StencilOp) Depth()  *StencilOp {
+   gl.Enable(gl.DEPTH_TEST)
+   return s
+}
+
+func (s *StencilOp) NoDepth() *StencilOp {
+   gl.Disable(gl.DEPTH_TEST)
+   return s
+}
+
+func (s *StencilOp) DepthMask() *StencilOp {
+   gl.DepthMask(gl.TRUE)
+   return s
+}
+
+func (s *StencilOp) NoDepthMask() *StencilOp {
+   gl.DepthMask(gl.FALSE)
+   return s
+}
+
+func (s *StencilOp) Keep() *StencilOp {
+   gl.StencilOp(gl.KEEP, gl.KEEP, gl.KEEP)
+   return s
+}
+
+func (s *StencilOp) Replace() *StencilOp {
+   gl.StencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
+   return s
+}
+
+func (s *StencilOp) Increment() *StencilOp {
+   gl.StencilOp(gl.KEEP, gl.KEEP, gl.INCR)
+   return s
+}
+
+func (s *StencilOp) Decrement() *StencilOp {
+   gl.StencilOp(gl.KEEP, gl.KEEP, gl.DECR)
+   return s
 }

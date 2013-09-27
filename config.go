@@ -1,7 +1,7 @@
 package render
 
 import (
-    "fmt"
+    // "fmt"
     "regexp"
     "reflect"
     "strconv"
@@ -127,7 +127,7 @@ func (c *ControlBindings) Apply(receiver interface{}, bindings map[string]string
                 if name == "" {
                     c.UnbindMouseClick(button)
                 } else {
-                    fmt.Println("bind", i, button, glfw.MouseButton1)
+                    // fmt.Println("bind", i, button, glfw.MouseButton1)
                     startAction := FindActionMethod(receiverValue, name)
                     stopAction := FindActionMethod(receiverValue, stopName)
                     c.BindMouseClick(button, startAction, stopAction)
