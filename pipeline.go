@@ -15,6 +15,45 @@ import (
    "unsafe"
 )
 
+
+type Color [4]gl.Float
+type ColorPallet []Color
+
+var (
+   Red     = Color{1,0,0,1}
+   Green   = Color{0,1,0,1}
+   Blue    = Color{0,0,1,1}
+   
+   Black   = Color{0,0,0,1}
+   White   = Color{1,1,1,1}
+   
+   Orange  = Color{1,0.5,0,1}
+   Pink    = Color{1,0,0.5,1}
+   Lime    = Color{0.5,1,0,1}
+   Aqua    = Color{0,1,0.5,1}
+   Purple  = Color{0.5,0,1,1}
+   SkyBlue = Color{0,0.5,1,1}
+   
+   Yellow  = Color{1,1,0,1}
+   Cyan    = Color{0,1,1,1}
+   Magenta = Color{1,0,1,1}
+   
+   SoftRed   = Color{0.8,0.2,0.2,1}
+   SoftGreen = Color{0.2,0.8,0.2,1}
+   SoftBlue  = Color{0.2,0.2,0.8,1}
+   
+   SoftWhite = Color{0.8,0.8,0.8,1}
+   SoftBlack  = Color{0.2,0.2,0.2,1}
+
+   DebugPallet = ColorPallet{
+      SoftRed, SoftGreen, SoftBlue, Orange, Pink, Lime, Aqua, Purple, Yellow, Cyan, Magenta,
+   }
+)
+
+func (pallet ColorPallet) Pick(n int) *Color {
+   return &pallet[n % len(pallet)]
+}
+
 type ShaderLibrary struct {
    FragmentShaders map[string]gl.FragmentShader
    VertexShaders   map[string]gl.VertexShader
@@ -340,6 +379,7 @@ func (s *StencilOp) Enable() *StencilOp {
    s.Keep()
    s.Depth()
    s.DepthMask()
+   s.DepthLT()
    return s
 }
 
@@ -348,11 +388,22 @@ func (s *StencilOp) Disable() *StencilOp {
    s.Draw()
    s.Depth()
    s.DepthMask()
+   s.DepthLT()
    return s
 }
 
 func (s *StencilOp) Draw() *StencilOp {
    gl.ColorMask(gl.TRUE, gl.TRUE, gl.TRUE, gl.TRUE)
+   return s
+}
+
+func (s *StencilOp) DepthLE() *StencilOp {
+   gl.DepthFunc(gl.LEQUAL)
+   return s
+}
+
+func (s *StencilOp) DepthLT() *StencilOp {
+   gl.DepthFunc(gl.LESS)
    return s
 }
 
