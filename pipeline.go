@@ -407,6 +407,11 @@ func (s *StencilOp) DepthLT() *StencilOp {
    return s
 }
 
+func (s *StencilOp) DepthAlways() *StencilOp {
+   gl.DepthFunc(gl.ALWAYS)
+   return s
+}
+
 func (s *StencilOp) NoDraw() *StencilOp {
    gl.ColorMask(gl.FALSE, gl.FALSE, gl.FALSE, gl.FALSE)
    return s
