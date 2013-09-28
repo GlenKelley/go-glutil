@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+type GameTime struct {
+	Now     time.Time
+	Elapsed time.Duration
+	Delta   time.Duration
+}
+
+type DoSimulation func()
+
 type WindowDelegate interface {
 	Init(window *glfw.Window)
 	Draw(window *glfw.Window)
@@ -14,10 +22,78 @@ type WindowDelegate interface {
 	MouseMove(window *glfw.Window, xpos float64, ypos float64)
 	KeyPress(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw.ModifierKey)
 	Scroll(window *glfw.Window, xoff float64, yoff float64)
-	Simulate(now time.Time, elapsed time.Duration, duration time.Duration)
+	Simulate(time GameTime)
 	OnClose(window *glfw.Window)
 	IsIdle() bool
 	NeedsRender() bool
+}
+
+type WindowDelegator struct {
+	Delegate WindowDelegate
+}
+
+func (wd *WindowDelegator) Init(window *glfw.Window) {
+	wd.Delegate.Init(window)
+}
+func (wd *WindowDelegator) Draw(window *glfw.Window) {
+	wd.Delegate.Draw(window)
+}
+func (wd *WindowDelegator) Reshape(window *glfw.Window, width, height int) {
+	wd.Delegate.Reshape(window, width, height)
+}
+func (wd *WindowDelegator) MouseClick(window *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
+	wd.Delegate.MouseClick(window, button, action, mod)
+}
+func (wd *WindowDelegator) MouseMove(window *glfw.Window, xpos float64, ypos float64) {
+	wd.Delegate.MouseMove(window, xpos, ypos)
+}
+func (wd *WindowDelegator) KeyPress(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw.ModifierKey) {
+	wd.Delegate.KeyPress(window, k, s, action, mods)
+}
+func (wd *WindowDelegator) Scroll(window *glfw.Window, xoff float64, yoff float64) {
+	wd.Delegate.Scroll(window, xoff, yoff)
+}
+func (wd *WindowDelegator) Simulate(time GameTime) {
+	wd.Delegate.Simulate(time)
+}
+func (wd *WindowDelegator) OnClose(window *glfw.Window) {
+	wd.Delegate.OnClose(window)
+}
+func (wd *WindowDelegator) IsIdle() bool {
+	return wd.Delegate.IsIdle()
+}
+func (wd *WindowDelegator) NeedsRender() bool {
+	return wd.Delegate.NeedsRender()
+}
+
+type IdleSimulatorWindowDelegator struct {
+	WindowDelegator
+	DoSimulate DoSimulation
+}
+
+func (wd *IdleSimulatorWindowDelegator) MouseClick(window *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
+	if wd.WindowDelegator.IsIdle() {
+		wd.DoSimulate()
+	}
+	wd.WindowDelegator.MouseClick(window, button, action, mod)
+}
+func (wd *IdleSimulatorWindowDelegator) MouseMove(window *glfw.Window, xpos float64, ypos float64) {
+	if wd.WindowDelegator.IsIdle() {
+		wd.DoSimulate()
+	}
+	wd.WindowDelegator.MouseMove(window, xpos, ypos)
+}
+func (wd *IdleSimulatorWindowDelegator) KeyPress(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw.ModifierKey) {
+	if wd.WindowDelegator.IsIdle() {
+		wd.DoSimulate()
+	}
+	wd.WindowDelegator.KeyPress(window, k, s, action, mods)
+}
+func (wd *IdleSimulatorWindowDelegator) Scroll(window *glfw.Window, xoff float64, yoff float64) {
+	if wd.WindowDelegator.IsIdle() {
+		wd.DoSimulate()
+	}
+	wd.WindowDelegator.Scroll(window, xoff, yoff)
 }
 
 func WindowAspectRatio(window *glfw.Window) float64 {
@@ -68,22 +144,30 @@ func CreateWindow(width, height int, name string, fullscreen bool, delegate Wind
 		window.SetInputMode(glfw.Cursor, glfw.CursorDisabled)
 	}
 
-	bindEvents(window, delegate)
+	start := time.Now()
+	last := start
+	doSimulation := func() {
+		now := time.Now()
+		gameTime := GameTime{
+			now,
+			now.Sub(start),
+			now.Sub(last),
+		}
+		delegate.Simulate(gameTime)
+		last = now
+	}
 
+	bindEvents(window, &IdleSimulatorWindowDelegator{
+		WindowDelegator{delegate},
+		doSimulation,
+	})
 	window.MakeContextCurrent()
 	glfw.SwapInterval(1)
-
 	delegate.Init(window)
 	frameWidth, frameHeight := window.GetFramebufferSize()
 	delegate.Reshape(window, frameWidth, frameHeight)
-	start := time.Now()
-	last := start
 	for !window.ShouldClose() {
-		now := time.Now()
-		duration := now.Sub(last)
-		elapsed := now.Sub(start)
-		delegate.Simulate(now, elapsed, duration)
-		last = now
+		doSimulation()
 		if delegate.NeedsRender() {
 			delegate.Draw(window)
 		}
