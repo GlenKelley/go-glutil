@@ -47,7 +47,16 @@ var (
 	DebugPallet = ColorPallet{
 		SoftRed, SoftGreen, SoftBlue, Orange, Pink, Lime, Aqua, Purple, Yellow, Cyan, Magenta,
 	}
+   
 )
+
+func ToVec3D(v glm.Vec4f) glm.Vec3f {
+   return glm.Vec3f{v[0], v[1], v[2]}
+}
+
+func ToHomogVec4D(v glm.Vec3f) glm.Vec4f {
+   return glm.Vec4f{v[0], v[1], v[2], 0.0}
+}
 
 func (pallet ColorPallet) Pick(n int) *Color {
 	return &pallet[n%len(pallet)]
