@@ -3,7 +3,7 @@ package render
 import (
 	"errors"
 	"fmt"
-	gl "github.com/GlenKelley/go-gl32"
+	gl "github.com/GlenKelley/go-gl/gl32"
 	glm "github.com/Jragonmiris/mathgl"
 	"image"
 	_ "image/jpeg"
@@ -576,4 +576,34 @@ func MakeElements(elementMap map[gl.Enum][]int16) []*DrawElements {
 		elements = append(elements, drawElements)
 	}
 	return elements
+}
+
+
+func RotationComponent(m glm.Mat4d) glm.Mat3d {
+   m2 := glm.Ident3d()
+   j := 0
+   for i := 0; i < 3; i++ {
+      v := Vec4f{}
+      v[i] = 1
+      vt := m.Mul4x1(v)
+      for k := 0; k < 3; k++ {
+         m2[j] = vt[k]
+         j++
+      }
+   }
+   return m2
+}
+
+
+func Quaternion(m glm.Mat3d) glm.Quatd {
+   q := glm.Quatf{}
+   m00,m01,m02 := m[0],m[1],m[2]
+   m10,m11,m12 := m[3],m[4],m[5]
+   m20,m21,m22 := m[6],m[7],m[8]
+   
+   q.W    = math.Sqrt(math.Max(0,1 + m00 + m11 + m22)) / 2
+   q.V[0] = math.Copysign(math.Sqrt(math.Max(0, 1 + m00 - m11 - m22  ) / 2, m12 - m21))
+   q.V[1] = math.Copysign(math.Sqrt(math.Max( 0, 1 - m00 + m11 - m22  ) / 2, m20 - m02))
+   q.V[2] = math.Copysign(math.Sqrt(math.Max( 0, 1 - m00 - m11 + m22  ) / 2, m01 - m10))
+   return q
 }
