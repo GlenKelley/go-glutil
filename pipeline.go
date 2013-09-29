@@ -50,12 +50,12 @@ var (
    
 )
 
-func ToVec3D(v glm.Vec4f) glm.Vec3f {
-   return glm.Vec3f{v[0], v[1], v[2]}
+func ToVec3D(v glm.Vec4d) glm.Vec3d {
+   return glm.Vec3d{v[0], v[1], v[2]}
 }
 
-func ToHomogVec4D(v glm.Vec3f) glm.Vec4f {
-   return glm.Vec4f{v[0], v[1], v[2], 0.0}
+func ToHomogVec4D(v glm.Vec3d) glm.Vec4d {
+   return glm.Vec4d{v[0], v[1], v[2], 0.0}
 }
 
 func (pallet ColorPallet) Pick(n int) *Color {
@@ -135,6 +135,15 @@ func (lib *ShaderLibrary) UseProgram(tag string) {
 func (lib *ShaderLibrary) GetProgram(tag string) (gl.Program, bool) {
 	program, ok := lib.Programs[tag]
 	return program, ok
+}
+
+func MatArray(d glm.Mat4d) *gl.Float {
+   n := len(d)
+   f := make([]gl.Float, n)
+   for i := 0; i < n; i++ {
+      f[i] = gl.Float(d[i])
+   }
+   return &f[0]
 }
 
 func ArrayPtr(data interface{}) (gl.Pointer, gl.Sizeiptr) {
@@ -476,7 +485,7 @@ func (s *StencilOp) Decrement() *StencilOp {
 }
 
 type Model struct {
-	Transform glm.Mat4f
+	Transform glm.Mat4d
 	Geometry  []*Geometry
 	Children  []*Model
 }
@@ -493,14 +502,14 @@ type DrawElements struct {
 	Count    int
 }
 
-func NewSingleModel(verticies, normals []float32, elements []int16, drawType gl.Enum, transform glm.Mat4f) *Model {
+func NewSingleModel(verticies, normals []float64, elements []int16, drawType gl.Enum, transform glm.Mat4d) *Model {
 	drawElements := []*DrawElements{NewDrawElements(elements, drawType)}
 	geometries := []*Geometry{NewGeometry(verticies, normals, drawElements)}
 	model := NewModel([]*Model{}, geometries, transform)
 	return model
 }
 
-func NewModel(children []*Model, geometry []*Geometry, transform glm.Mat4f) *Model {
+func NewModel(children []*Model, geometry []*Geometry, transform glm.Mat4d) *Model {
 	return &Model{
 		transform,
 		geometry,
@@ -510,7 +519,7 @@ func NewModel(children []*Model, geometry []*Geometry, transform glm.Mat4f) *Mod
 
 func EmptyModel() *Model {
 	return &Model{
-		glm.Ident4f(),
+		glm.Ident4d(),
 		[]*Geometry{},
 		[]*Model{},
 	}
@@ -524,7 +533,7 @@ func (model *Model) AddGeometry(geometry ...*Geometry) {
 	model.Geometry = append(model.Geometry, geometry...)
 }
 
-func NewGeometry(verticies, normals []float32, elements []*DrawElements) *Geometry {
+func NewGeometry(verticies, normals []float64, elements []*DrawElements) *Geometry {
 	var vertexBuffer gl.Buffer = 0
 	var normalBuffer gl.Buffer = 0
 	if len(verticies) > 0 {

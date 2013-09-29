@@ -20,7 +20,7 @@ type mouseButtonEvent struct {
 }
 
 type Action func()
-type MouseMoveAction func(position, delta glm.Vec2f)
+type MouseMoveAction func(position, delta glm.Vec2d)
 
 type ControlBindings struct {
 	keyBindings          map[keyEvent]Action
@@ -97,7 +97,7 @@ func FindActionMethod(v reflect.Value, name string) Action {
 func FindMouseMoveActionMethod(v reflect.Value, name string) MouseMoveAction {
 	m := v.MethodByName(name)
 	if m.IsValid() {
-		return MouseMoveAction(m.Interface().(func(glm.Vec2f, glm.Vec2f)))
+		return MouseMoveAction(m.Interface().(func(glm.Vec2d, glm.Vec2d)))
 	} else {
 		return nil
 	}
