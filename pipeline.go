@@ -1,20 +1,20 @@
 package render
 
 import (
-	"os"
-	"fmt"
-   "math"
-	"image"
 	"errors"
-	"unsafe"
-	"reflect"
-	"io/ioutil"
-	_ "image/png"
-	_ "image/jpeg"
-	"runtime/debug"
-	glm "github.com/Jragonmiris/mathgl"
-	gl "github.com/GlenKelley/go-gl/gl32"
+	"fmt"
 	collada "github.com/GlenKelley/go-collada"
+	gl "github.com/GlenKelley/go-gl/gl32"
+	glm "github.com/Jragonmiris/mathgl"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
+	"io/ioutil"
+	"math"
+	"os"
+	"reflect"
+	"runtime/debug"
+	"unsafe"
 )
 
 type Color [4]gl.Float
@@ -49,15 +49,14 @@ var (
 	DebugPallet = ColorPallet{
 		SoftRed, SoftGreen, SoftBlue, Orange, Pink, Lime, Aqua, Purple, Yellow, Cyan, Magenta,
 	}
-   
 )
 
 func ToVec3D(v glm.Vec4d) glm.Vec3d {
-   return glm.Vec3d{v[0], v[1], v[2]}
+	return glm.Vec3d{v[0], v[1], v[2]}
 }
 
 func ToHomogVec4D(v glm.Vec3d) glm.Vec4d {
-   return glm.Vec4d{v[0], v[1], v[2], 0.0}
+	return glm.Vec4d{v[0], v[1], v[2], 0.0}
 }
 
 func (pallet ColorPallet) Pick(n int) *Color {
@@ -140,12 +139,12 @@ func (lib *ShaderLibrary) GetProgram(tag string) (gl.Program, bool) {
 }
 
 func MatArray(d glm.Mat4d) *gl.Float {
-   n := len(d)
-   f := make([]gl.Float, n)
-   for i := 0; i < n; i++ {
-      f[i] = gl.Float(d[i])
-   }
-   return &f[0]
+	n := len(d)
+	f := make([]gl.Float, n)
+	for i := 0; i < n; i++ {
+		f[i] = gl.Float(d[i])
+	}
+	return &f[0]
 }
 
 func ArrayPtr(data interface{}) (gl.Pointer, gl.Sizeiptr) {
@@ -487,12 +486,14 @@ func (s *StencilOp) Decrement() *StencilOp {
 }
 
 type Model struct {
+	Name      string
 	Transform glm.Mat4d
 	Geometry  []*Geometry
 	Children  []*Model
 }
 
 type Geometry struct {
+	Name         string
 	VertexBuffer gl.Buffer
 	NormalBuffer gl.Buffer
 	Elements     []*DrawElements
@@ -504,23 +505,25 @@ type DrawElements struct {
 	Count    int
 }
 
-func NewSingleModel(verticies, normals []float64, elements []int16, drawType gl.Enum, transform glm.Mat4d) *Model {
+func NewSingleModel(name string, verticies, normals []float64, elements []int16, drawType gl.Enum, transform glm.Mat4d) *Model {
 	drawElements := []*DrawElements{NewDrawElements(elements, drawType)}
-	geometries := []*Geometry{NewGeometry(verticies, normals, drawElements)}
-	model := NewModel([]*Model{}, geometries, transform)
+	geometries := []*Geometry{NewGeometry(name+"-mesh", verticies, normals, drawElements)}
+	model := NewModel(name, []*Model{}, geometries, transform)
 	return model
 }
 
-func NewModel(children []*Model, geometry []*Geometry, transform glm.Mat4d) *Model {
+func NewModel(name string, children []*Model, geometry []*Geometry, transform glm.Mat4d) *Model {
 	return &Model{
+		name,
 		transform,
 		geometry,
 		children,
 	}
 }
 
-func EmptyModel() *Model {
+func EmptyModel(name string) *Model {
 	return &Model{
+		name,
 		glm.Ident4d(),
 		[]*Geometry{},
 		[]*Model{},
@@ -535,7 +538,7 @@ func (model *Model) AddGeometry(geometry ...*Geometry) {
 	model.Geometry = append(model.Geometry, geometry...)
 }
 
-func NewGeometry(verticies, normals []float64, elements []*DrawElements) *Geometry {
+func NewGeometry(name string, verticies, normals []float64, elements []*DrawElements) *Geometry {
 	var vertexBuffer gl.Buffer = 0
 	var normalBuffer gl.Buffer = 0
 	if len(verticies) > 0 {
@@ -547,6 +550,7 @@ func NewGeometry(verticies, normals []float64, elements []*DrawElements) *Geomet
 		BindArrayData(normalBuffer, normals)
 	}
 	return &Geometry{
+		name,
 		vertexBuffer,
 		normalBuffer,
 		elements,
@@ -580,135 +584,133 @@ func MakeElements(elementMap map[gl.Enum][]int16) []*DrawElements {
 	return elements
 }
 
-
 func RotationComponent(m glm.Mat4d) glm.Mat3d {
-   m2 := glm.Ident3d()
-   j := 0
-   for i := 0; i < 3; i++ {
-      v := glm.Vec4d{}
-      v[i] = 1
-      vt := m.Mul4x1(v)
-      for k := 0; k < 3; k++ {
-         m2[j] = vt[k]
-         j++
-      }
-   }
-   return m2
+	m2 := glm.Ident3d()
+	j := 0
+	for i := 0; i < 3; i++ {
+		v := glm.Vec4d{}
+		v[i] = 1
+		vt := m.Mul4x1(v)
+		for k := 0; k < 3; k++ {
+			m2[j] = vt[k]
+			j++
+		}
+	}
+	return m2
 }
 
-
 func Quaternion(m glm.Mat3d) glm.Quatd {
-   q := glm.Quatd{}
-   m00,m01,m02 := m[0],m[1],m[2]
-   m10,m11,m12 := m[3],m[4],m[5]
-   m20,m21,m22 := m[6],m[7],m[8]
-   
-   q.W    = math.Sqrt(math.Max(0,1 + m00 + m11 + m22)) / 2
-   q.V[0] = math.Copysign(math.Sqrt(math.Max(0, 1 + m00 - m11 - m22)) / 2, m12 - m21)
-   q.V[1] = math.Copysign(math.Sqrt(math.Max(0, 1 - m00 + m11 - m22)) / 2, m20 - m02)
-   q.V[2] = math.Copysign(math.Sqrt(math.Max(0, 1 - m00 - m11 + m22)) / 2, m01 - m10)
-   return q
+	q := glm.Quatd{}
+	m00, m01, m02 := m[0], m[1], m[2]
+	m10, m11, m12 := m[3], m[4], m[5]
+	m20, m21, m22 := m[6], m[7], m[8]
+
+	q.W = math.Sqrt(math.Max(0, 1+m00+m11+m22)) / 2
+	q.V[0] = math.Copysign(math.Sqrt(math.Max(0, 1+m00-m11-m22))/2, m12-m21)
+	q.V[1] = math.Copysign(math.Sqrt(math.Max(0, 1-m00+m11-m22))/2, m20-m02)
+	q.V[2] = math.Copysign(math.Sqrt(math.Max(0, 1-m00-m11+m22))/2, m01-m10)
+	return q
 }
 
 func LoadSceneAsModel(filename string) (*Model, error) {
-   doc, err := collada.LoadDocument(filename)
-   if err != nil {
-      return nil, err
-   }
-   index, err := NewIndex(doc)
-   if err != nil {
-      return nil, err
-   }   
-   model := EmptyModel()
-   switch doc.Asset.UpAxis {
-   case collada.Xup:
-   case collada.Yup:
-   case collada.Zup:
-      model.Transform = glm.HomogRotate3DXd(-90).Mul4(glm.HomogRotate3DZd(90))
-   }
-   
-   geometryTemplates := make(map[collada.Id][]*Geometry)
-   for id, mesh := range index.Mesh {
-      geoms := make([]*Geometry, 0)
-      for _, pl := range mesh.Polylist {
-         elements := make([]*DrawElements, 0)
-         drawElements := NewDrawElements(pl.TriangleElements, gl.TRIANGLES)
-         if drawElements != nil {
-            elements = append(elements, drawElements)
-         }
-         geometry := NewGeometry(pl.VertexData, pl.NormalData, elements)
-         geoms = append(geoms, geometry)  
-      }
-      if len(geoms) > 0 {
-         geometryTemplates[id] = geoms
-      }
-   }
-   for _, node := range index.VisualScene.Node {
-      child, ok := LoadModel(index, node, geometryTemplates)
-      if ok {
-         model.AddChild(child)
-      }
-   }
-   return model, nil
+	doc, err := collada.LoadDocument(filename)
+	if err != nil {
+		return nil, err
+	}
+	index, err := NewIndex(doc)
+	if err != nil {
+		return nil, err
+	}
+	model := EmptyModel("scene")
+	switch doc.Asset.UpAxis {
+	case collada.Xup:
+	case collada.Yup:
+	case collada.Zup:
+		model.Transform = glm.HomogRotate3DXd(-90).Mul4(glm.HomogRotate3DZd(90))
+	}
+
+	geometryTemplates := make(map[collada.Id][]*Geometry)
+	for id, mesh := range index.Mesh {
+		geoms := make([]*Geometry, 0)
+		for _, pl := range mesh.Polylist {
+			elements := make([]*DrawElements, 0)
+			drawElements := NewDrawElements(pl.TriangleElements, gl.TRIANGLES)
+			if drawElements != nil {
+				elements = append(elements, drawElements)
+			}
+			geometry := NewGeometry(string(id), pl.VertexData, pl.NormalData, elements)
+			geoms = append(geoms, geometry)
+		}
+		if len(geoms) > 0 {
+			geometryTemplates[id] = geoms
+		}
+	}
+	for _, node := range index.VisualScene.Node {
+		child, ok := LoadModel(index, node, geometryTemplates)
+		if ok {
+			model.AddChild(child)
+		}
+	}
+	return model, nil
 }
 
 func LoadModel(index *Index, node *collada.Node, geometryTemplates map[collada.Id][]*Geometry) (*Model, bool) {
-   transform, ok := index.Transforms[node.Id]
-   if !ok {
-      panic("no transform for id", node.ID)
-   }
-   geoms := make([]*Geometry, 0)
-   children := make([]*Model, 0)
-   for _, geoinstance := range node.InstanceGeometry {
-      geoid, _ := geoinstance.Url.Id()
-      geoms = append(geoms, geometryTemplates[geoid]...)
-   }
-   for _, childNode := range node.Node {
-      child, ok := LoadModel(index, childNode, geometryTemplates)
-      if ok {
-         children = append(children, child)
-      }
-   }
-   model := NewModel(children, geoms, transform)
-   return model, len(geoms) > 0 || len(children) > 0
+	transform, ok := index.Transforms[node.Id]
+	if !ok {
+		panic("no transform for id " + node.Id)
+	}
+	geoms := make([]*Geometry, 0)
+	children := make([]*Model, 0)
+	for _, geoinstance := range node.InstanceGeometry {
+		geoid, _ := geoinstance.Url.Id()
+		geoms = append(geoms, geometryTemplates[geoid]...)
+	}
+	for _, childNode := range node.Node {
+		child, ok := LoadModel(index, childNode, geometryTemplates)
+		if ok {
+			children = append(children, child)
+		}
+	}
+	model := NewModel(node.Name, children, geoms, transform)
+	return model, len(geoms) > 0 || len(children) > 0
 }
 
 func DrawModel(mv glm.Mat4d, model *Model, modelview gl.UniformLocation, vertexAttribute gl.AttributeLocation, vao gl.VertexArrayObject) {
-   mv2 := mv.Mul4(model.Transform)
-   gl.UniformMatrix4fv(modelview, 1, gl.FALSE, MatArray(mv2))
-   for _, geo := range model.Geometry {
-      DrawGeometry(geo, vertexAttribute, vao)
-   }
-   for _, child := range model.Children {
-      DrawModel(mv2, child, modelview, vertexAttribute, vao)
-   }
+	mv2 := mv.Mul4(model.Transform)
+	gl.UniformMatrix4fv(modelview, 1, gl.FALSE, MatArray(mv2))
+	for _, geo := range model.Geometry {
+		DrawGeometry(geo, vertexAttribute, vao)
+	}
+	for _, child := range model.Children {
+		DrawModel(mv2, child, modelview, vertexAttribute, vao)
+	}
 }
 
 func DrawGeometry(geo *Geometry, vertexAttribute gl.AttributeLocation, vao gl.VertexArrayObject) {
-   gl.BindBuffer(gl.ARRAY_BUFFER, geo.VertexBuffer)
-   gl.BindVertexArray(vao)
-   gl.VertexAttribPointer(vertexAttribute, 3, gl.FLOAT, gl.FALSE, 12, nil)
-   gl.EnableVertexAttribArray(vertexAttribute)
-   for _, elem := range geo.Elements {
-      gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, elem.Buffer)
-      gl.DrawElements(elem.DrawType, gl.Sizei(elem.Count), gl.UNSIGNED_SHORT, nil)
-      PanicOnError()         
-   }
-   gl.DisableVertexAttribArray(vertexAttribute)
+	gl.BindBuffer(gl.ARRAY_BUFFER, geo.VertexBuffer)
+	gl.BindVertexArray(vao)
+	gl.VertexAttribPointer(vertexAttribute, 3, gl.FLOAT, gl.FALSE, 12, nil)
+	gl.EnableVertexAttribArray(vertexAttribute)
+	for _, elem := range geo.Elements {
+		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, elem.Buffer)
+		gl.DrawElements(elem.DrawType, gl.Sizei(elem.Count), gl.UNSIGNED_SHORT, nil)
+		PanicOnError()
+	}
+	gl.DisableVertexAttribArray(vertexAttribute)
 }
 
 func Grid(n int) *Geometry {
-   vs := make([]float64, 0, n*12)
-   ns := make([]float64, 0, n*12)
-   es := make([]int16, 0, n*4)
-   ec := int16(0)
-   for i := -n; i <= n; i++ {
-      nd := float64(n)
-      id := float64(i)
-      vs = append(vs, -nd, 0,  id,    nd, 0,  id,   id, 0, -nd,  id, 0,  nd)
-      ns = append(ns, 0,1,0,0,1,0,0,1,0,0,1,0)
-      es = append(es, ec, ec+1, ec+2, ec+3)
-      ec += 4
-   }
-   return NewGeometry(vs, ns, []*DrawElements{NewDrawElements(es, gl.LINES)})
+	vs := make([]float64, 0, n*12)
+	ns := make([]float64, 0, n*12)
+	es := make([]int16, 0, n*4)
+	ec := int16(0)
+	for i := -n; i <= n; i++ {
+		nd := float64(n)
+		id := float64(i)
+		vs = append(vs, -nd, 0, id, nd, 0, id, id, 0, -nd, id, 0, nd)
+		ns = append(ns, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0)
+		es = append(es, ec, ec+1, ec+2, ec+3)
+		ec += 4
+	}
+	return NewGeometry("grid-mesh", vs, ns, []*DrawElements{NewDrawElements(es, gl.LINES)})
 }

@@ -71,10 +71,10 @@ func (c *ControlBindings) UnbindMouseMovement() {
 }
 
 func (c *ControlBindings) DoKeyAction(key glfw.Key, keyAction glfw.Action) {
-   boundAction, ok := c.FindKeyAction(key, keyAction)
-   if ok {
-      boundAction()
-   }
+	boundAction, ok := c.FindKeyAction(key, keyAction)
+	if ok {
+		boundAction()
+	}
 }
 
 func (c *ControlBindings) FindKeyAction(key glfw.Key, keyAction glfw.Action) (Action, bool) {
