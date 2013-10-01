@@ -14,6 +14,7 @@ import (
 	"runtime/debug"
 	glm "github.com/Jragonmiris/mathgl"
 	gl "github.com/GlenKelley/go-gl/gl32"
+	collada "github.com/GlenKelley/go-collada"
 )
 
 type Color [4]gl.Float
@@ -607,4 +608,107 @@ func Quaternion(m glm.Mat3d) glm.Quatd {
    q.V[1] = math.Copysign(math.Sqrt(math.Max(0, 1 - m00 + m11 - m22)) / 2, m20 - m02)
    q.V[2] = math.Copysign(math.Sqrt(math.Max(0, 1 - m00 - m11 + m22)) / 2, m01 - m10)
    return q
+}
+
+func LoadSceneAsModel(filename string) (*Model, error) {
+   doc, err := collada.LoadDocument(filename)
+   if err != nil {
+      return nil, err
+   }
+   index, err := NewIndex(doc)
+   if err != nil {
+      return nil, err
+   }   
+   model := EmptyModel()
+   switch doc.Asset.UpAxis {
+   case collada.Xup:
+   case collada.Yup:
+   case collada.Zup:
+      model.Transform = glm.HomogRotate3DXd(-90).Mul4(glm.HomogRotate3DZd(90))
+   }
+   
+   geometryTemplates := make(map[collada.Id][]*Geometry)
+   for id, mesh := range index.Mesh {
+      geoms := make([]*Geometry, 0)
+      for _, pl := range mesh.Polylist {
+         elements := make([]*DrawElements, 0)
+         drawElements := NewDrawElements(pl.TriangleElements, gl.TRIANGLES)
+         if drawElements != nil {
+            elements = append(elements, drawElements)
+         }
+         geometry := NewGeometry(pl.VertexData, pl.NormalData, elements)
+         geoms = append(geoms, geometry)  
+      }
+      if len(geoms) > 0 {
+         geometryTemplates[id] = geoms
+      }
+   }
+   for _, node := range index.VisualScene.Node {
+      child, ok := LoadModel(index, node, geometryTemplates)
+      if ok {
+         model.AddChild(child)
+      }
+   }
+   return model, nil
+}
+
+func LoadModel(index *Index, node *collada.Node, geometryTemplates map[collada.Id][]*Geometry) (*Model, bool) {
+   transform, ok := index.Transforms[node.Id]
+   if !ok {
+      panic("no transform for id", node.ID)
+   }
+   geoms := make([]*Geometry, 0)
+   children := make([]*Model, 0)
+   for _, geoinstance := range node.InstanceGeometry {
+      geoid, _ := geoinstance.Url.Id()
+      geoms = append(geoms, geometryTemplates[geoid]...)
+   }
+   for _, childNode := range node.Node {
+      child, ok := LoadModel(index, childNode, geometryTemplates)
+      if ok {
+         children = append(children, child)
+      }
+   }
+   model := NewModel(children, geoms, transform)
+   return model, len(geoms) > 0 || len(children) > 0
+}
+
+func DrawModel(mv glm.Mat4d, model *Model, modelview gl.UniformLocation, vertexAttribute gl.AttributeLocation, vao gl.VertexArrayObject) {
+   mv2 := mv.Mul4(model.Transform)
+   gl.UniformMatrix4fv(modelview, 1, gl.FALSE, MatArray(mv2))
+   for _, geo := range model.Geometry {
+      DrawGeometry(geo, vertexAttribute, vao)
+   }
+   for _, child := range model.Children {
+      DrawModel(mv2, child, modelview, vertexAttribute, vao)
+   }
+}
+
+func DrawGeometry(geo *Geometry, vertexAttribute gl.AttributeLocation, vao gl.VertexArrayObject) {
+   gl.BindBuffer(gl.ARRAY_BUFFER, geo.VertexBuffer)
+   gl.BindVertexArray(vao)
+   gl.VertexAttribPointer(vertexAttribute, 3, gl.FLOAT, gl.FALSE, 12, nil)
+   gl.EnableVertexAttribArray(vertexAttribute)
+   for _, elem := range geo.Elements {
+      gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, elem.Buffer)
+      gl.DrawElements(elem.DrawType, gl.Sizei(elem.Count), gl.UNSIGNED_SHORT, nil)
+      PanicOnError()         
+   }
+   gl.DisableVertexAttribArray(vertexAttribute)
+}
+
+func Grid(n int) *Geometry {
+   vs := make([]float64, 0, n*12)
+   ns := make([]float64, 0, n*12)
+   es := make([]int16, 0, n*4)
+   ec := int16(0)
+   for i := -n; i <= n; i++ {
+      nd := float64(n)
+      id := float64(i)
+      vs = append(vs, -nd, 0,  id,    nd, 0,  id,   id, 0, -nd,  id, 0,  nd)
+      ns = append(ns, 0,1,0,0,1,0,0,1,0,0,1,0)
+      es = append(es, ec, ec+1, ec+2, ec+3)
+      ec += 4
+   }
+   return NewGeometry(vs, ns, []*DrawElements{NewDrawElements(es, gl.LINES)})
 }

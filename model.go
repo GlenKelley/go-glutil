@@ -96,13 +96,20 @@ func (index *Index) indexVisualScenes() {
                 index.AddId(vs.Id, vs)
 			}
 			for _, node := range vs.Node {
-				if len(node.Id) != 0 {
-                    index.AddId(node.Id, node)
-                    index.Transforms[node.Id] = NodeTransform(node)
-				}
+            index.indexNode(node)
 			}
 		}
 	}
+}
+
+func (index *Index) indexNode(node *collada.Node) {
+	if len(node.Id) != 0 {
+      index.AddId(node.Id, node)
+      index.Transforms[node.Id] = NodeTransform(node)
+	}
+   for _, child := range node.Node {
+      index.indexNode(child)
+   }
 }
 
 func (index *Index) indexGeometry() {
@@ -111,7 +118,7 @@ func (index *Index) indexGeometry() {
 			if len(g.Id) != 0 {
                 index.AddId(g.Id, g)
 			}
-            index.Mesh[g.Id] = index.createMesh(g.Mesh)
+         index.Mesh[g.Id] = index.createMesh(g.Mesh)
 		}
 	}
 }
@@ -172,6 +179,8 @@ func (index *Index) createMeshPolyList(pl *collada.Polylist, verticies map[strin
     vo, vs, no, ns, stride := index.ReadOffsets(pl.Input, verticies)
     dimensions := 3
     
+    //0 1 2 3
+    //0 1 2 - 0 2 3
     p := pl.P.I()
     i := 0
     for _, v := range pl.VCount.I() {
@@ -194,6 +203,16 @@ func (index *Index) createMeshPolyList(pl *collada.Polylist, verticies map[strin
             switch v {
             case 3:
                 mpl.TriangleElements = append(mpl.TriangleElements, int16(index))
+             case 4:
+                if j == 3 {
+                   //split quad into triangle
+                   n := len(mpl.TriangleElements)
+                   p0 := mpl.TriangleElements[n-3]
+                   p1 := mpl.TriangleElements[n-1]
+                   mpl.TriangleElements = append(mpl.TriangleElements, p0, p1, int16(index))
+                } else {
+                   mpl.TriangleElements = append(mpl.TriangleElements, int16(index))
+                }
             default:
                 fmt.Println("unsupported polygon size:", v)
             }
