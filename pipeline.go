@@ -490,6 +490,7 @@ type Model struct {
 	Transform glm.Mat4d
 	Geometry  []*Geometry
 	Children  []*Model
+   Parent    *Model
 }
 
 type Geometry struct {
@@ -505,6 +506,14 @@ type DrawElements struct {
 	Count    int
 }
 
+func (model *Model) WorldTransform() glm.Mat4d {
+   t := model.Transform
+   for parent := model.Parent; parent != nil; parent = parent.Parent {
+      t = parent.Transform.Mul4(t)
+   }
+   return t
+}
+
 func NewSingleModel(name string, verticies, normals []float64, elements []int16, drawType gl.Enum, transform glm.Mat4d) *Model {
 	drawElements := []*DrawElements{NewDrawElements(elements, drawType)}
 	geometries := []*Geometry{NewGeometry(name+"-mesh", verticies, normals, drawElements)}
@@ -513,12 +522,17 @@ func NewSingleModel(name string, verticies, normals []float64, elements []int16,
 }
 
 func NewModel(name string, children []*Model, geometry []*Geometry, transform glm.Mat4d) *Model {
-	return &Model{
+	model := &Model{
 		name,
 		transform,
 		geometry,
 		children,
+      nil,
 	}
+   for _, child := range children {
+      child.Parent = model
+   }
+   return model
 }
 
 func EmptyModel(name string) *Model {
@@ -527,10 +541,12 @@ func EmptyModel(name string) *Model {
 		glm.Ident4d(),
 		[]*Geometry{},
 		[]*Model{},
+      nil,
 	}
 }
 
 func (model *Model) AddChild(child *Model) {
+   child.Parent = model
 	model.Children = append(model.Children, child)
 }
 
