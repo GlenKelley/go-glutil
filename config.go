@@ -21,17 +21,23 @@ type mouseButtonEvent struct {
 
 type Action func()
 type MouseMoveAction func(position, delta glm.Vec2d)
+type ScrollAction func(xoff, yoff float64)
 
 type ControlBindings struct {
 	keyBindings          map[keyEvent]Action
 	mouseButtonBindings  map[mouseButtonEvent]Action
 	mouseMovementBinding MouseMoveAction
+	scrollBinding  ScrollAction
+   
+   lastMousePosition glm.Vec2d
+   hasLastMousePosition bool
 }
 
 func (c *ControlBindings) ResetBindings() {
 	c.keyBindings = map[keyEvent]Action{}
 	c.mouseButtonBindings = map[mouseButtonEvent]Action{}
 	c.mouseMovementBinding = nil
+   c.scrollBinding = nil
 }
 
 func (c *ControlBindings) BindKeyPress(key glfw.Key, press Action, release Action) {
@@ -50,6 +56,14 @@ func (c *ControlBindings) BindMouseClick(button glfw.MouseButton, press Action, 
 	if release != nil {
 		c.mouseButtonBindings[mouseButtonEvent{button, glfw.Release}] = release
 	}
+}
+
+func (c *ControlBindings) BindScroll(action ScrollAction) {
+	c.scrollBinding = action
+}
+
+func (c *ControlBindings) UnbindScroll() {
+	c.scrollBinding = nil
 }
 
 func (c *ControlBindings) UnbindKeyPress(key glfw.Key) {
@@ -77,6 +91,39 @@ func (c *ControlBindings) DoKeyAction(key glfw.Key, keyAction glfw.Action) {
 	}
 }
 
+func (c *ControlBindings) DoMouseButtonAction(button glfw.MouseButton, mouseAction glfw.Action) {
+	boundAction, ok := c.FindClickAction(button, mouseAction)
+	if ok {
+		boundAction()
+	}
+}
+
+func MouseCoord(window *glfw.Window, xpos, ypos float64) glm.Vec2d {
+   width, height := window.GetSize()
+   return glm.Vec2d{xpos / float64(width), 1 - ypos / float64(height)}
+}
+
+func (c *ControlBindings) DoMouseMoveAction(window *glfw.Window, xpos, ypos float64) {
+   pos := MouseCoord(window, xpos, ypos)
+   boundAction, ok := c.FindMouseMovementAction()
+   if ok {
+      delta := pos.Sub(c.lastMousePosition)
+      if !c.hasLastMousePosition {
+         c.hasLastMousePosition = true
+         delta = glm.Vec2d{}
+      }
+      boundAction(pos, delta)
+   }
+   c.lastMousePosition = pos
+}
+
+func (c *ControlBindings) DoScrollAction(xoff, yoff float64) {
+   boundAction, ok := c.FindScrollAction()
+   if ok {
+      boundAction(xoff, yoff)
+   }
+}
+
 func (c *ControlBindings) FindKeyAction(key glfw.Key, keyAction glfw.Action) (Action, bool) {
 	action, ok := c.keyBindings[keyEvent{key, keyAction}]
 	return action, ok
@@ -91,6 +138,11 @@ func (c *ControlBindings) FindClickAction(button glfw.MouseButton, buttonAction 
 func (c *ControlBindings) FindMouseMovementAction() (MouseMoveAction, bool) {
 	return c.mouseMovementBinding, c.mouseMovementBinding != nil
 }
+
+func (c *ControlBindings) FindScrollAction() (ScrollAction, bool) {
+	return c.scrollBinding, c.scrollBinding != nil
+}
+
 
 func FindActionMethod(v reflect.Value, name string) Action {
 	m := v.MethodByName(name)
