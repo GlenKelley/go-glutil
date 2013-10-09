@@ -1,6 +1,8 @@
 package render
 
 import (
+   "os"
+   "encoding/json"
 	// "fmt"
 	glm "github.com/Jragonmiris/mathgl"
 	glfw "github.com/go-gl/glfw3"
@@ -202,3 +204,29 @@ func (c *ControlBindings) Apply(receiver interface{}, bindings map[string]string
 		}
 	}
 }
+
+func LoadConfiguration(confFile string, constants interface{}, bindings *ControlBindings, receiver interface{}) error {
+   file, err := os.Open(confFile)
+   if err == nil {
+      defer file.Close()
+      decoder := json.NewDecoder(file)
+      root := map[string]interface{}{}
+      err = decoder.Decode(&root)
+      if err != nil { return err }
+      if constants, ok := root["constants"]; ok {
+         bytes, err := json.Marshal(constants)
+         if err != nil { return err }
+         err = json.Unmarshal(bytes, &constants)
+         if err != nil { return err }
+      }
+      if controls, ok := root["controls"]; ok {
+         sc := make(map[string]string)
+         for k, v := range controls.(map[string]interface{}) {
+            sc[k] = v.(string)
+         }
+         bindings.Apply(receiver, sc)
+      }
+   }
+   return err
+}
+

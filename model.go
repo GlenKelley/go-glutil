@@ -76,24 +76,24 @@ func NodeTransform(node *collada.Node) glm.Mat4d {
 	transform := glm.Ident4d()
 	for _, matrix := range node.Matrix {
 		v := matrix.F()
-		transform = glm.Mat4d{
+		transform = transform.Mul4(glm.Mat4d{
 			v[0], v[1], v[2], v[3],
 			v[4], v[5], v[6], v[7],
 			v[8], v[9], v[10], v[11],
 			v[12], v[13], v[14], v[15],
-		}.Transpose().Mul4(transform)
+		}.Transpose())
 	}
 	for _, translate := range node.Translate {
 		v := translate.F()
-		transform = glm.Translate3Dd(v[0], v[1], v[2]).Mul4(transform)
+		transform = transform.Mul4(glm.Translate3Dd(v[0], v[1], v[2]))
 	}
 	for _, rotation := range node.Rotate {
 		v := rotation.F()
-		transform = glm.HomogRotate3Dd(v[3]*math.Pi/180, glm.Vec3d{v[0], v[1], v[2]}).Mul4(transform)
+		transform = transform.Mul4(glm.HomogRotate3Dd(v[3]*math.Pi/180, glm.Vec3d{v[0], v[1], v[2]}))
 	}
 	for _, scale := range node.Scale {
 		v := scale.F()
-		transform = glm.Scale3Dd(v[0], v[1], v[2]).Mul4(transform)
+		transform = transform.Mul4(glm.Scale3Dd(v[0], v[1], v[2]))
 	}
 	return transform
 }

@@ -488,6 +488,7 @@ func (s *StencilOp) Decrement() *StencilOp {
 type Model struct {
 	Name      string
 	Transform glm.Mat4d
+	BaseTransform glm.Mat4d
 	Geometry  []*Geometry
 	Children  []*Model
    Parent    *Model
@@ -525,6 +526,7 @@ func NewModel(name string, children []*Model, geometry []*Geometry, transform gl
 	model := &Model{
 		name,
 		transform,
+		transform,
 		geometry,
 		children,
       nil,
@@ -539,6 +541,7 @@ func EmptyModel(name string) *Model {
 	return &Model{
 		name,
 		glm.Ident4d(),
+		glm.Ident4d(),
 		[]*Geometry{},
 		[]*Model{},
       nil,
@@ -550,8 +553,27 @@ func (model *Model) AddChild(child *Model) {
 	model.Children = append(model.Children, child)
 }
 
-func (model *Model) AddGeometry(geometry ...*Geometry) {
+func (model *Model) FindModelWithName(name string) (*Model, bool) {
+   if model.Name == name {
+      return model, true
+   }
+   for _, child := range model.Children {
+      m, found := child.FindModelWithName(name)
+      if found {
+         return m, true
+      }
+   }
+   return nil, false
+}
+
+func (model *Model) AddGeometry(geometry ...*Geometry) *Model {
 	model.Geometry = append(model.Geometry, geometry...)
+   return model
+}
+
+func (model *Model) SetTransform(m glm.Mat4d) *Model {
+   model.Transform = m
+   return model
 }
 
 func NewGeometry(name string, verticies, normals []float64, elements []*DrawElements) *Geometry {
@@ -715,6 +737,51 @@ func DrawGeometry(geo *Geometry, vertexAttribute gl.AttributeLocation, vao gl.Ve
 	gl.DisableVertexAttribArray(vertexAttribute)
 }
 
+func Wheel() *Geometry {
+   n := 20
+   r := 1.0
+
+	vs := make([]float64, 0, 4*n*3)
+	ns := make([]float64, 0, 4*n*3)
+	ec := int16(0)
+   
+   de := make([]*DrawElements, 0, 3)
+   for w := -1; w <= 1; w += 2 {
+      wf := float64(w)
+   	es := make([]int16, 0, 1 + n)
+      
+      vs = append(vs, 0,0,float64(w))
+      ns = append(ns, 0,0,1)
+      es = append(es, ec)
+      ec++
+   	for i := 0; i <= n; i++ {
+         theta := float64(i) / float64(n) * 2 * math.Pi
+         x := r * math.Sin(theta)
+         y := r * math.Cos(theta)
+         vs = append(vs, x, y, wf)
+   		ns = append(ns, 0, 0, 1)
+   		es = append(es, ec)
+   		ec += 1
+   	}
+      de = append(de, NewDrawElements(es, gl.TRIANGLE_FAN))
+   }
+
+	es := make([]int16, 0, 2*n)
+   w := 1.0
+	for i := 0; i <= n; i++ {
+      theta := float64(i) / float64(n) * 2 * math.Pi
+      x := r * math.Sin(theta)
+      y := r * math.Cos(theta)
+      vs = append(vs, x, y, -w, x, y, w)
+		ns = append(ns, 0, 0, 1, 0, 0, 1)
+		es = append(es, ec, ec+1)
+		ec += 2
+   }
+   de = append(de, NewDrawElements(es, gl.TRIANGLE_STRIP))
+	return NewGeometry("wheel-mesh", vs, ns, de)
+   
+}
+
 func Grid(n int) *Geometry {
 	vs := make([]float64, 0, n*12)
 	ns := make([]float64, 0, n*12)
@@ -729,4 +796,51 @@ func Grid(n int) *Geometry {
 		ec += 4
 	}
 	return NewGeometry("grid-mesh", vs, ns, []*DrawElements{NewDrawElements(es, gl.LINES)})
+}
+
+func V3(v glm.Vec4d) glm.Vec3d {
+   return glm.Vec3d{v[0], v[1], v[2]}
+}
+
+func Rotation(angle float64, axis glm.Vec4d) glm.Mat4d {
+   return glm.HomogRotate3Dd(angle, V3(axis))
+}
+
+func Translate(v glm.Vec4d) glm.Mat4d {
+   return glm.Translate3Dd(v[0], v[1], v[2])
+}
+
+func NearZero(v glm.Vec4d) bool {
+	return v.ApproxEqual(glm.Vec4d{})
+}
+
+func Cross3D(a, b glm.Vec4d) glm.Vec3d {
+	a3 := glm.Vec3d{a[0], a[1], a[2]}
+	b3 := glm.Vec3d{b[0], b[1], b[2]}
+	return a3.Cross(b3)
+}
+
+func Cross3Dv(a, b glm.Vec4d) glm.Vec4d {
+	c := Cross3D(a, b)
+	return glm.Vec4d{c[0], c[1], c[2], 0}
+}
+
+func RotationBetweenNormals(n1, n2 glm.Vec4d) glm.Mat4d {
+	axis := Cross3Dv(n1, n2)
+	dot := n1.Dot(n2)
+	if !NearZero(axis) {
+		angle := math.Acos(dot)
+		return Rotation(angle, axis.Normalize())
+	} else if dot < 0 {
+		for e := 0; e < 3; e++ {
+			v := glm.Vec4d{}
+			v[e] = 1
+			cross := Cross3Dv(n1, v)
+			if !NearZero(cross) {
+				return Rotation(math.Pi, cross.Normalize())
+			}
+		}
+		panic(fmt.Sprintln("no orthogonal axis found for normal", n1))
+	}
+	return glm.Ident4d()
 }
