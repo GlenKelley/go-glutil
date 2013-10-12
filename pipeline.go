@@ -779,8 +779,47 @@ func Wheel() *Geometry {
    }
    de = append(de, NewDrawElements(es, gl.TRIANGLE_STRIP))
 	return NewGeometry("wheel-mesh", vs, ns, de)
-   
 }
+
+func Sphere() *Geometry {
+   n := 20
+   r := 1.0
+
+	vs := make([]float64, 0)
+	ns := make([]float64, 0)
+	es := make([]int16, 0)
+	ec := int16(0)
+   
+   de := make([]*DrawElements, 0)
+   delta := math.Pi * 2 / float64(n)
+   for theta := -math.Pi; theta < math.Pi; theta += delta {
+      for phi := 0.0; phi < 2 * math.Pi; phi += delta {
+         rz := r * math.Cos(phi)
+         x := rz * math.Sin(theta)
+         y := rz * math.Cos(theta)
+         z := r * math.Sin(phi)
+
+         xt := rz * math.Sin(theta + delta)
+         yt := rz * math.Cos(theta + delta)
+         
+         zp := r * math.Sin(phi + delta)
+         rzp := r * math.Cos(phi + delta)
+         xp := rzp * math.Sin(theta)
+         yp := rzp * math.Cos(theta)
+
+         xtp := rzp * math.Sin(theta + delta)
+         ytp := rzp * math.Cos(theta + delta)
+         
+         vs = append(vs, x,y,z, xt,yt,z, xtp,ytp,zp, x,y,z, xp,yp,zp, xtp,ytp,zp)
+   		ns = append(ns, x,y,z, xt,yt,z, xtp,ytp,zp, x,y,z, xp,yp,zp, xtp,ytp,zp)
+   		es = append(es, ec, ec+1, ec+2, ec+3, ec+4, ec+5, ec+6)
+         ec += 6
+      }
+   }
+   de = append(de, NewDrawElements(es, gl.TRIANGLES))
+	return NewGeometry("sphere-mesh", vs, ns, de)
+}
+
 
 func Grid(n int) *Geometry {
 	vs := make([]float64, 0, n*12)

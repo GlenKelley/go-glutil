@@ -110,17 +110,19 @@ func bindEvents(window *glfw.Window, delegate WindowDelegate) {
 	window.SetCloseCallback(delegate.OnClose)
 }
 
-func CreateWindow(width, height int, name string, fullscreen bool, delegate WindowDelegate) error {
+func CreateWindow(width, height int, name string, fullscreen bool, delegate WindowDelegate, legacy bool) error {
 	if !glfw.Init() {
 		return errors.New("Failed to initialize GLFW")
 	}
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.DepthBits, 16)
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 2)
-	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
-	glfw.WindowHint(glfw.OpenglForwardCompatible, 1)
+   if !legacy {
+   	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+   	glfw.WindowHint(glfw.ContextVersionMinor, 2)
+   	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+   	glfw.WindowHint(glfw.OpenglForwardCompatible, 1)      
+   }
 
 	var monitor *glfw.Monitor = nil
 	var err error = nil
